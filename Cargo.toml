@@ -26,7 +26,13 @@ publish = false
 # Calendar dates for per-day budgets. Default features are off so the core
 # crate cannot read the system clock by accident: callers pass the day in.
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
-serde = { version = "1.0.229", features = ["derive"] }
+# Benchmarks (dev-only): timing with warm-up and outlier detection.
+criterion = "0.8.2"
+# Concurrent hash map for the per-(campaign, day) budget counters.
+dashmap = "6.2.1"
+# Property-based tests (dev-only): random inputs checked against invariants.
+proptest = "1.11.0"
+serde ={ version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
 tokio = "1.53"

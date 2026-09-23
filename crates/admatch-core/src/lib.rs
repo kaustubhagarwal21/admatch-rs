@@ -24,6 +24,7 @@
 
 pub mod budget;
 pub mod engine;
+pub mod index;
 pub mod model;
 pub mod normalize;
 pub mod privacy;

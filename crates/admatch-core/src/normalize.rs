@@ -45,15 +45,7 @@ pub fn normalize(query: &str) -> Result<Vec<String>, QueryError> {
         return Err(QueryError::TooLong);
     }
 
-    // `str::to_lowercase` (rather than per-character lowercasing) applies
-    // context-sensitive rules such as the Greek final sigma correctly.
-    let cleaned: String = query
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
-        .collect();
-
-    let tokens: Vec<String> = cleaned.split_whitespace().map(str::to_owned).collect();
+    let tokens = tokenize(query);
 
     if tokens.is_empty() {
         Err(QueryError::Empty)
@@ -62,6 +54,24 @@ pub fn normalize(query: &str) -> Result<Vec<String>, QueryError> {
     } else {
         Ok(tokens)
     }
+}
+
+/// The normalisation rules without the request limits.
+///
+/// Keywords and negative keywords are split with this, so they follow exactly
+/// the same rules as queries (one definition, no drift). The limits are not
+/// applied here because they protect the request path, not the index build.
+/// Text with no letters or digits gives an empty list.
+pub fn tokenize(text: &str) -> Vec<String> {
+    // `str::to_lowercase` (rather than per-character lowercasing) applies
+    // context-sensitive rules such as the Greek final sigma correctly.
+    let cleaned: String = text
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+        .collect();
+
+    cleaned.split_whitespace().map(str::to_owned).collect()
 }
 
 #[cfg(test)]

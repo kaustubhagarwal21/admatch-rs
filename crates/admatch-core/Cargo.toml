@@ -11,14 +11,28 @@ publish.workspace = true
 [dependencies]
 # NaiveDate identifies the budget day; no clock access (see workspace note).
 chrono = { workspace = true }
+# Concurrent map from (campaign, day) to an atomic spend counter.
+dashmap = { workspace = true }
 # Derive JSON (de)serialisation for the model and the auction outcome.
 serde = { workspace = true }
 # Derive std::error::Error for the library's error enums.
 thiserror = { workspace = true }
 
 [dev-dependencies]
+# Micro-benchmarks for matching and the auction (benches/).
+criterion = { workspace = true }
+# Property tests: index vs brute-force reference, auction invariants.
+proptest = { workspace = true }
 # Tests check the exact JSON field names the HTTP API relies on.
 serde_json = { workspace = true }
+
+[[bench]]
+name = "match"
+harness = false
+
+[[bench]]
+name = "auction"
+harness = false
 
 [lints]
 workspace = true

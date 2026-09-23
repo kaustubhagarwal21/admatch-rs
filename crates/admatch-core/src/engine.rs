@@ -16,6 +16,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::budget::BudgetStore;
+use crate::index::{KeywordIndex, KeywordMatch};
 use crate::model::{
     AgeBucket, Campaign, CampaignId, Country, KeywordId, MatchType, Micros, RelevanceBp,
 };
@@ -56,12 +57,16 @@ pub enum BuildError {
     /// reported unambiguously.
     #[error("duplicate keyword id {0:?}")]
     DuplicateKeyword(KeywordId),
+    /// More distinct tokens than a `u32` token id can number.
+    #[error("too many distinct keyword tokens to intern")]
+    VocabularyFull,
 }
 
 /// An immutable, query-ready view of every campaign.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     campaigns: Vec<Campaign>,
+    index: KeywordIndex,
     cfg: EngineConfig,
 }
 
@@ -81,7 +86,24 @@ impl Snapshot {
                 }
             }
         }
-        Ok(Snapshot { campaigns, cfg })
+        let index = KeywordIndex::build(&campaigns).map_err(|_| BuildError::VocabularyFull)?;
+        Ok(Snapshot {
+            campaigns,
+            index,
+            cfg,
+        })
+    }
+
+    /// Campaigns whose keywords match `query`, each with its single best
+    /// keyword, after negative keywords are applied. Sorted by the
+    /// campaign's position in the snapshot. Targeting and bids are not
+    /// checked here; that is the auction's job.
+    pub fn matches(&self, query: &str) -> Result<Vec<KeywordMatch>, QueryError> {
+        let tokens = normalize(query)?;
+        let prepared = self.index.prepare(&tokens);
+        let mut matches = self.index.best_matches(&prepared);
+        matches.retain(|m| !self.index.negative_matches(m.campaign_pos, &prepared));
+        Ok(matches)
     }
 
     /// Number of campaigns in the snapshot (reported by `/metrics`).
