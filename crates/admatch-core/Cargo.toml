@@ -1,0 +1,24 @@
+[package]
+name = "admatch-core"
+description = "Pure AdMatch logic: query normalisation, keyword index, auction, budgets and privacy rules. No I/O."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+# NaiveDate identifies the budget day; no clock access (see workspace note).
+chrono = { workspace = true }
+# Derive JSON (de)serialisation for the model and the auction outcome.
+serde = { workspace = true }
+# Derive std::error::Error for the library's error enums.
+thiserror = { workspace = true }
+
+[dev-dependencies]
+# Tests check the exact JSON field names the HTTP API relies on.
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

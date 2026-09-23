@@ -1,0 +1,27 @@
+# Local infrastructure for development. Postgres only for now; Redis and
+# nginx join when budgets are shared across replicas.
+#
+#   make up     # start in the background
+#   make down   # stop (data is kept in the named volume)
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: admatch
+      POSTGRES_PASSWORD: admatch
+      POSTGRES_DB: admatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # The server waits for this before connecting, instead of failing while
+    # Postgres is still starting up.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admatch -d admatch"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

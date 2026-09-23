@@ -1,0 +1,22 @@
+[package]
+name = "admatch-server"
+description = "AdMatch HTTP service: serves ad matches over JSON and owns all I/O."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Async runtime. "macros" provides #[tokio::main]; "rt-multi-thread" is the
+# work-stealing scheduler that #[tokio::main] uses by default. More features
+# (net, signal, time) are added when the HTTP server needs them.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+# Structured logging: `tracing` emits events, `tracing-subscriber` prints
+# them. "env-filter" lets RUST_LOG choose what gets printed.
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

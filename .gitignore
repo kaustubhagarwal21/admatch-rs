@@ -1,0 +1,9 @@
+# Build output
+target/
+
+# Local configuration; .env.example is the committed template
+.env
+
+# Generated seed data and request files (reproducible from a fixed seed)
+data/*.json
+data/*.jsonl

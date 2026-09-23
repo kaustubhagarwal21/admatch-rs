@@ -1,0 +1,5 @@
+# Tests may unwrap: a panic there is a clear, local test failure, which is
+# exactly what we want. Production code is still covered by the
+# unwrap_used/expect_used lints configured in the workspace Cargo.toml.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
