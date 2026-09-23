@@ -28,14 +28,21 @@ test:
 # Everything CI checks, in the same order.
 check: fmt-check lint test
 
+# Start the HTTP server (release build; settings come from the environment,
+# see .env.example). It serves data/seed.json, so run `make seed` first.
 run:
-	cargo run -p admatch-server
+	cargo run --release -p admatch-server --bin admatch-server
 
+# Generate data/seed.json and data/requests.jsonl. The fixed seed makes the
+# output identical on every machine; override with `make seed SEED=7`.
+SEED ?= 42
 seed:
-	@echo "seed: available from M3 (seed data generator)"
+	cargo run --release -p admatch-server --bin seed -- --seed $(SEED)
 
+# Criterion microbenchmarks for keyword matching and the auction. Results
+# are written to target/criterion; see docs/BENCHMARKS.md for recorded runs.
 bench:
-	@echo "bench: available from M1 (criterion benches)"
+	cargo bench -p admatch-core
 
 # Start and stop the local Postgres container.
 up:

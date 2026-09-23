@@ -1,10 +1,10 @@
-//! AdMatch server binary.
-//!
-//! For now this only starts the async runtime and structured logging, so the
-//! binary, the build and CI exist end to end. The HTTP service (routes,
-//! configuration, graceful shutdown) is built on top of this entry point in a
-//! later milestone.
+//! AdMatch server binary: reads the configuration, starts the index loader
+//! and serves HTTP until ctrl-c or SIGTERM.
 
+use admatch_server::config::Config;
+use admatch_server::routes::router;
+use admatch_server::state::{AppState, keep_index_fresh};
+use anyhow::Context;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -18,14 +18,84 @@ const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::INFO;
 /// `#[tokio::main]` wraps this `async fn` in a synchronous `main` that builds
 /// a multi-threaded tokio runtime and blocks on it: roughly a thread pool that
 /// runs lightweight tasks instead of one OS thread per request.
+///
+/// Returning `anyhow::Result` means a startup error (bad configuration, port
+/// already in use) is printed with its context and the process exits with a
+/// non-zero status.
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     init_tracing();
+    let cfg = Config::from_env().context("invalid configuration")?;
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
+        bind_addr = %cfg.bind_addr,
         "admatch-server starting"
     );
-    tracing::info!("no HTTP listener yet (skeleton build), exiting");
+
+    // Install the Prometheus recorder globally, so every counter!/histogram!
+    // call in the process is recorded, and keep a handle to render it.
+    let recorder =
+        admatch_server::metrics::build_recorder().context("invalid metrics configuration")?;
+    let handle = recorder.handle();
+    metrics::set_global_recorder(recorder).context("a metrics recorder was already installed")?;
+
+    let state = AppState::new(cfg.engine, handle);
+
+    // The listener starts before the index is loaded: until the first load
+    // finishes, /healthz answers 503 and /v1/match answers not_ready.
+    tokio::spawn(keep_index_fresh(
+        state.clone(),
+        cfg.campaign_source.clone(),
+        cfg.index_refresh,
+    ));
+
+    let listener = tokio::net::TcpListener::bind(cfg.bind_addr)
+        .await
+        .with_context(|| format!("cannot listen on {}", cfg.bind_addr))?;
+    tracing::info!(addr = %cfg.bind_addr, "listening");
+
+    // Graceful shutdown: on a signal, stop accepting new connections and
+    // let in-flight requests finish before returning.
+    axum::serve(listener, router(state))
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("server error")?;
+    tracing::info!("shut down cleanly");
+    Ok(())
+}
+
+/// Completes when the process receives ctrl-c (SIGINT) or, on Unix, SIGTERM
+/// (what `docker stop` and Kubernetes send).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            tracing::error!(error = %err, "cannot listen for ctrl-c");
+            // Without a working handler, never trigger shutdown from here.
+            std::future::pending::<()>().await;
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut stream) => {
+                stream.recv().await;
+            }
+            Err(err) => {
+                tracing::error!(error = %err, "cannot listen for SIGTERM");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    // Whichever signal arrives first wins.
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
+    }
+    tracing::info!("shutdown signal received, draining in-flight requests");
 }
 
 /// Installs the global logger, filtered by the `RUST_LOG` environment

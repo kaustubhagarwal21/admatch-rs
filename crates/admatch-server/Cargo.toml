@@ -7,16 +7,60 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+# The package has two binaries (the server and `seed`); `cargo run` without
+# `--bin` starts the server.
+default-run = "admatch-server"
 
 [dependencies]
-# Async runtime. "macros" provides #[tokio::main]; "rt-multi-thread" is the
-# work-stealing scheduler that #[tokio::main] uses by default. More features
-# (net, signal, time) are added when the HTTP server needs them.
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+# The matching engine, auction, budgets and privacy rules.
+admatch-core = { path = "../admatch-core" }
+# `anyhow` gives the binaries one error type with context messages; the
+# library code uses `thiserror` enums instead.
+anyhow = { workspace = true }
+# Lock-free pointer swap: request handlers read the current index snapshot
+# while a reload publishes a new one, and neither ever waits on a lock.
+arc-swap = { workspace = true }
+# HTTP routing, extractors and the server loop.
+axum = { workspace = true }
+# "clock" adds `Utc::now()`, which the server needs to know today's budget
+# day. The core crate deliberately does not enable it.
+chrono = { workspace = true, features = ["clock"] }
+# Command-line flags for the seed binary.
+clap = { workspace = true }
+# `metrics` provides the counter!/histogram!/gauge! macros; the Prometheus
+# exporter stores the values and renders them for GET /metrics.
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+# Seeded, reproducible random data for the seed binary. ChaCha output is
+# fixed by its specification, so a given --seed gives identical data on
+# every machine and every version of the crate.
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# "net" for the TCP listener, "signal" for graceful shutdown, "time" for the
+# periodic index reload.
+tokio = { workspace = true, features = [
+    "macros",
+    "rt-multi-thread",
+    "net",
+    "signal",
+    "time",
+] }
+# Middleware: request tracing, a per-request timeout and a body-size limit.
+tower-http = { workspace = true, features = ["trace", "timeout", "limit"] }
 # Structured logging: `tracing` emits events, `tracing-subscriber` prints
 # them. "env-filter" lets RUST_LOG choose what gets printed.
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+# Impression IDs are UUIDv7: time-ordered, so they index well in Postgres.
+uuid = { workspace = true, features = ["v7", "serde"] }
+
+[dev-dependencies]
+# `ServiceExt::oneshot` sends one request straight into the router, with no
+# network socket, which keeps the API tests fast and deterministic.
+tower = { workspace = true, features = ["util"] }
 
 [lints]
 workspace = true
