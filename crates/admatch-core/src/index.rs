@@ -41,6 +41,7 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+use crate::auction::Bidder;
 use crate::model::{Campaign, CampaignId, KeywordId, MatchType, Micros, RelevanceBp, TokenId};
 use crate::normalize::tokenize;
 
@@ -101,6 +102,15 @@ impl KeywordMatch {
     /// `bid × relevance`, the value the auction ranks by.
     pub fn score(&self) -> u128 {
         score(self.bid, self.relevance)
+    }
+
+    /// The auction's view of this match.
+    pub fn bidder(&self) -> Bidder {
+        Bidder {
+            campaign_id: self.campaign_id,
+            bid: self.bid,
+            relevance: self.relevance,
+        }
     }
 
     /// True when `self` should be preferred over `other` as the campaign's

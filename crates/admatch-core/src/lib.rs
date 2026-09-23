@@ -19,9 +19,12 @@
 //! * [`model`]: the shared vocabulary (IDs, money, campaigns, keywords).
 //! * [`normalize`]: turns a raw search query into tokens.
 //! * [`privacy`]: the audience-size rule for personalised targeting.
-//! * [`budget`]: per-campaign daily spend tracking.
-//! * [`engine`]: the index snapshot and the auction that picks one ad.
+//! * [`index`]: the inverted keyword index (exact, broad, negative match).
+//! * [`auction`]: ranking and second-price (GSP) pricing, as pure functions.
+//! * [`budget`]: per-campaign daily spend tracking with atomic counters.
+//! * [`engine`]: the snapshot that ties them together and runs one auction.
 
+pub mod auction;
 pub mod budget;
 pub mod engine;
 pub mod index;
