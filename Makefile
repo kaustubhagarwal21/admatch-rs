@@ -41,8 +41,12 @@ seed:
 
 # Criterion microbenchmarks for keyword matching and the auction. Results
 # are written to target/criterion; see docs/BENCHMARKS.md for recorded runs.
+# The bench targets are named so criterion flags can be appended, e.g.
+# `make bench BENCH_ARGS="--warm-up-time 2 --measurement-time 5"` (the
+# library's own test harness would reject them).
+BENCH_ARGS ?=
 bench:
-	cargo bench -p admatch-core
+	cargo bench -p admatch-core --bench match --bench auction -- $(BENCH_ARGS)
 
 # Start and stop the local Postgres container.
 up:

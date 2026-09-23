@@ -72,7 +72,11 @@ Requires stable Rust (edition 2024).
 ```sh
 make check   # fmt --check, clippy -D warnings, tests (same as CI)
 make run     # start the server
+make bench   # criterion microbenchmarks for matching and the auction
 ```
+
+Recorded benchmark results, with the machine and exact command, are in
+[docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## License
 
