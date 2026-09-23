@@ -197,6 +197,9 @@ impl Snapshot {
         Ok(AuctionOutcome {
             winner,
             candidates: eligible.len(),
+            // Taken from the selection, not counted from the ranking: the
+            // ranking is cut to ten rows and only built in debug mode.
+            budget_skipped: selection.budget_skipped,
             ranking,
         })
     }
@@ -312,6 +315,11 @@ pub struct AuctionOutcome {
     pub winner: Option<Winner>,
     /// Campaigns that entered the auction.
     pub candidates: usize,
+    /// Candidates skipped because their daily budget could not cover their
+    /// price. Always the full count, whether or not `debug` was set, so the
+    /// `budget_rejections_total` metric does not depend on the ranking
+    /// (which is cut to [`DEBUG_RANKING_LIMIT`] rows).
+    pub budget_skipped: usize,
     /// Top candidates with scores and exclusion reasons; only in debug mode.
     pub ranking: Option<Vec<RankedEntry>>,
 }
@@ -611,6 +619,52 @@ mod tests {
             ]
         );
         assert_eq!(budgets.spent(CampaignId(1), day()), Micros(0));
+    }
+
+    /// Regression: budget skips used to be counted from the debug ranking,
+    /// which holds at most ten rows, so an auction that skipped twelve
+    /// campaigns reported only ten.
+    #[test]
+    fn budget_skipped_counts_every_skip_even_past_the_ranking_limit() {
+        // Twelve high bidders whose budget is below the reserve, so none of
+        // them can pay any price, plus one lower bidder that can.
+        let mut campaigns: Vec<Campaign> = (1..=12)
+            .map(|i| Campaign {
+                daily_budget: Micros(50_000),
+                ..bidding(i, 2_000_000 + i * 10_000)
+            })
+            .collect();
+        campaigns.push(bidding(13, 1_000_000));
+        let snap = Snapshot::build(campaigns, EngineConfig::default()).unwrap();
+
+        // Without debug: no ranking is built, the count is still complete.
+        let out = snap
+            .run(&request("photo editor"), &BudgetStore::in_memory(), day())
+            .unwrap();
+        assert_eq!(out.winner.unwrap().campaign_id, CampaignId(13));
+        assert_eq!(out.budget_skipped, 12);
+        assert_eq!(out.ranking, None);
+
+        // With debug: the ranking stops at ten rows, the count does not.
+        let out = snap
+            .run(&debug("photo editor"), &BudgetStore::in_memory(), day())
+            .unwrap();
+        assert_eq!(out.budget_skipped, 12);
+        assert_eq!(out.ranking.unwrap().len(), DEBUG_RANKING_LIMIT);
+    }
+
+    #[test]
+    fn no_one_can_pay_means_every_candidate_was_skipped() {
+        let broke = |id: i64| Campaign {
+            daily_budget: Micros(50_000),
+            ..bidding(id, 1_000_000)
+        };
+        let snap = Snapshot::build(vec![broke(1), broke(2)], EngineConfig::default()).unwrap();
+        let out = snap
+            .run(&request("photo editor"), &BudgetStore::in_memory(), day())
+            .unwrap();
+        assert_eq!(out.winner, None);
+        assert_eq!(out.budget_skipped, 2);
     }
 
     #[test]

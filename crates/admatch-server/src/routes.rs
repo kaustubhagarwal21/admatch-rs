@@ -153,12 +153,9 @@ async fn match_ad(
         country,
         personalized: req.personalized,
         age_bucket,
-        // The ranking is requested on every auction, not only when the
-        // client asks for debug output, because it is where the engine
-        // reports candidates skipped for budget (the budget_rejections_total
-        // metric). It holds at most ten entries; it is removed from the
-        // response below unless the client asked for it.
-        debug: true,
+        // The ranking is built (and sorted) only when the client asks for
+        // it; the budget-skip metric comes from `outcome.budget_skipped`.
+        debug: req.debug,
     };
     // Budgets are per UTC day, so "today" is the UTC date.
     let today = chrono::Utc::now().date_naive();
@@ -174,7 +171,7 @@ async fn match_ad(
         ad: outcome.winner,
         candidates: outcome.candidates,
         took_us: u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX),
-        ranking: if req.debug { outcome.ranking } else { None },
+        ranking: outcome.ranking,
     }))
 }
 

@@ -11,7 +11,7 @@
 
 use std::time::Duration;
 
-use admatch_core::engine::{AuctionOutcome, ExclusionReason, Snapshot};
+use admatch_core::engine::{AuctionOutcome, Snapshot};
 use metrics::{counter, gauge, histogram};
 use metrics_exporter_prometheus::{BuildError, Matcher, PrometheusBuilder, PrometheusRecorder};
 
@@ -69,14 +69,9 @@ pub fn record_auction(outcome: &AuctionOutcome) {
     };
     counter!(AUCTIONS, "outcome" => label).increment(1);
 
-    // Budget skips are reported through the ranking (see the match handler
-    // for why the ranking is always requested).
-    let skipped = outcome
-        .ranking
-        .iter()
-        .flatten()
-        .filter(|entry| entry.excluded == Some(ExclusionReason::Budget))
-        .count();
+    // Use the engine's full count, not the debug ranking: the ranking is
+    // cut to ten rows, so counting its "budget" rows would undercount.
+    let skipped = outcome.budget_skipped;
     if skipped > 0 {
         counter!(BUDGET_REJECTIONS).increment(u64::try_from(skipped).unwrap_or(u64::MAX));
     }
